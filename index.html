@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Rent Contract | Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/web3/1.8.2/web3.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f5f7fb;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #6e8efb, #4a6cf7);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .account-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .rooms-list {
+            margin-top: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .room-item {
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        input {
+            padding: 10px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        button {
+            background: #4a6cf7;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            background: #3955d1;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-badge.active { background: #e1f7e1; color: #28a745; }
+        .status-badge.pending { background: #fff3cd; color: #ffc107; }
+        .status-badge.completed { background: #cff4fc; color: #0dcaf0; }
+
+        .account-switcher {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .error-message {
+            color: #dc3545;
+            margin-top: 5px;
+            font-size: 14px;
+        }
+        #loadingIndicator {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 1000;
+        }
+
+        /* Error Message */
+        .error-message {
+            color: #dc3545;
+            margin-top: 5px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-building"></i> Smart Rent Contract Dashboard</h1>
+            <div class="account-info">
+                <i class="fas fa-wallet"></i>
+                <div>
+                    <small>Current Account:</small>
+                    <div id="currentAccount"></div>
+                </div>
+            </div>
+            <div class="account-switcher">
+                <button onclick="switchToLandlord()">
+                    <i class="fas fa-user-tie"></i> Switch to Landlord
+                </button>
+                <button onclick="switchToTenant()">
+                    <i class="fas fa-user"></i> Switch to Tenant
+                </button>
+            </div>
+        </div>
+
+        <div class="grid">
+            <!-- Tenant Card -->
+            <div class="card">
+                <h3><i class="fas fa-home"></i> Tenant Actions</h3>
+                <div class="input-group">
+                    <input type="number" id="roomNumber" placeholder="Room Number" min="1">
+                    <input type="text" id="roomAddress" placeholder="Room Address">
+                    <button onclick="addRoom()">
+                        <i class="fas fa-plus"></i> Add Room
+                    </button>
+                </div>
+                <div class="input-group">
+                    <input type="number" id="rentAmount" placeholder="Amount in ETH" step="0.01">
+                    <button onclick="payRent()">
+                        <i class="fas fa-money-bill-wave"></i> Pay Rent
+                    </button>
+                </div>
+                <button onclick="signAgreement()" style="width: 100%; justify-content: center; margin-bottom: 15px;">
+                    <i class="fas fa-file-signature"></i> Sign Agreement
+                </button>
+                <div class="rooms-list" id="roomsList"></div>
+            </div>
+
+            <!-- Status Card -->
+            <div class="card">
+                <h3><i class="fas fa-chart-line"></i> Contract Status</h3>
+                <div style="margin-bottom: 20px;">
+                    <h4>Total Rent Paid</h4>
+                    <p style="font-size: 24px; color: #4a6cf7;"><span id="totalRentPaid">0</span> ETH</p>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <h4>Agreement Status</h4>
+                    <p><span id="agreementStatus" class="status-badge pending">Not Signed</span></p>
+                </div>
+                <button onclick="terminateAgreement()" style="width: 100%; justify-content: center; background: #dc3545;">
+                    <i class="fas fa-times-circle"></i> Terminate Agreement
+                </button>
+            </div>
+
+            <!-- Landlord Card -->
+            <div class="card">
+                <h3><i class="fas fa-user-tie"></i> Landlord Actions</h3>
+                <button onclick="completeAgreement()" style="width: 100%; justify-content: center;">
+                    <i class="fas fa-check-circle"></i> Complete Agreement
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let web3;
+        let contract;
+        let landlordAccount;
+        let tenantAccount;
+        let tenantAddress;
+        const contractAddress = '0xEBE7D7B081D6a25e518E3830Cf80dd2dfc9f1C3e'; // Replace after deployment
+        
+        const contractABI = [
+    {
+      "inputs": [],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "landlord",
+          "type": "address"
+        }
+      ],
+      "name": "AgreementCompleted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "tenant",
+          "type": "address"
+        }
+      ],
+      "name": "AgreementSigned",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "terminator",
+          "type": "address"
+        }
+      ],
+      "name": "AgreementTerminated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "tenant",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "RentPaid",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "roomNumber",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "roomAddress",
+          "type": "string"
+        }
+      ],
+      "name": "RoomAdded",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "agreementCompleted",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function",
+      "constant": true
+    },
+    {
+      "inputs": [],
+      "name": "agreementSigned",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function",
+      "constant": true
+    },
+    {
+      "inputs": [],
+      "name": "landlord",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function",
+      "constant": true
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "rooms",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "roomNumber",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "roomAddress",
+          "type": "string"
+        },
+        {
+          "internalType": "bool",
+          "name": "isOccupied",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function",
+      "constant": true
+    },
+    {
+      "inputs": [],
+      "name": "tenant",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function",
+      "constant": true
+    },
+    {
+      "inputs": [],
+      "name": "totalRentPaid",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function",
+      "constant": true
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_roomNumber",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "_roomAddress",
+          "type": "string"
+        }
+      ],
+      "name": "addRoom",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "canSignAgreement",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function",
+      "constant": true
+    },
+    {
+      "inputs": [],
+      "name": "signAgreement",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "payRent",
+      "outputs": [],
+      "stateMutability": "payable",
+      "type": "function",
+      "payable": true
+    },
+    {
+      "inputs": [],
+      "name": "completeAgreement",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "terminateAgreement",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getRooms",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "roomNumber",
+              "type": "uint256"
+            },
+            {
+              "internalType": "string",
+              "name": "roomAddress",
+              "type": "string"
+            },
+            {
+              "internalType": "bool",
+              "name": "isOccupied",
+              "type": "bool"
+            }
+          ],
+          "internalType": "struct RentContract.Room[]",
+          "name": "",
+          "type": "tuple[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function",
+      "constant": true
+    },
+    {
+      "inputs": [],
+      "name": "getTotalRentPaid",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function",
+      "constant": true
+    }
+  ];
+
+  async function initWeb3() {
+    if (typeof window.ethereum !== 'undefined') {
+        web3 = new Web3(window.ethereum);
+        try {
+            await window.ethereum.request({ method: 'eth_requestAccounts' });
+            const accounts = await web3.eth.getAccounts();
+            landlordAccount = accounts[0]; // Assuming landlord is the first account
+            tenantAccount = accounts[1]; // Assuming tenant is the second account
+
+            contract = new web3.eth.Contract(contractABI, contractAddress);
+            await updateUI();
+
+            // Listen for account changes
+            window.ethereum.on('accountsChanged', updateUI);
+        } catch (error) {
+            console.error("User denied account access");
+            alert('User denied account access');
+        }
+    } else {
+        alert('Please install MetaMask!');
+    }
+}
+
+async function updateUI() {
+    const accounts = await web3.eth.getAccounts();
+    document.getElementById('currentAccount').textContent = `${accounts[0]} (${getRole(accounts[0])})`;
+
+    try {
+        const totalPaid = await contract.methods.getTotalRentPaid().call();
+        document.getElementById('totalRentPaid').textContent = web3.utils.fromWei(totalPaid, 'ether');
+
+        const isAgreementSigned = await contract.methods.agreementSigned().call();
+        const isAgreementCompleted = await contract.methods.agreementCompleted().call();
+
+        let status = 'Not Signed';
+        let statusClass = 'pending';
+
+        if (isAgreementCompleted) {
+            status = 'Completed';
+            statusClass = 'completed';
+        } else if (isAgreementSigned) {
+            status = 'Active';
+            statusClass = 'active';
+        }
+
+        const statusElement = document.getElementById('agreementStatus');
+        statusElement.textContent = status;
+        statusElement.className = `status-badge ${statusClass}`;
+
+        // Update rooms list
+        const rooms = await contract.methods.getRooms().call();
+        const roomsList = document.getElementById('roomsList');
+        roomsList.innerHTML = rooms.map(room => `
+            <div class="room-item">
+                <strong>Room ${room.roomNumber}</strong><br>
+                Address: ${room.address}
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('Error updating UI:', error);
+    }
+}
+
+async function addRoom() {
+    const roomNumber = document.getElementById('roomNumber').value;
+    const roomAddress = document.getElementById('roomAddress').value;
+
+    if (!validateRoomInput()) return;
+
+    try {
+        const currentAccount = (await web3.eth.getAccounts())[0];
+        showLoadingIndicator(true); // Show loading indicator
+        await contract.methods.addRoom(roomNumber, roomAddress)
+            .send({ from: currentAccount });
+        await updateUI();
+        document.getElementById('roomNumber').value = '';
+        document.getElementById('roomAddress').value = '';
+        alert('Room added successfully!');
+    } catch (error) {
+        handleError(error, 'adding room');
+    } finally {
+        showLoadingIndicator(false); // Hide loading indicator
+    }
+}
+
+async function signAgreement() {
+    try {
+        const accounts = await web3.eth.getAccounts();
+        const currentAccount = accounts[0]; // Get the current account
+        console.log("Attempting to sign agreement with account:", currentAccount);
+        
+        showLoadingIndicator(true); // Show loading indicator
+
+        const result = await contract.methods.signAgreement()
+            .send({ from: currentAccount, gas: 300000 });
+
+
+        await updateUI();
+        alert('Agreement signed successfully! Transaction Hash: ' + result.transactionHash);
+    } catch (error) {
+        console.error("Error signing agreement:", error);
+        alert('Error signing agreement: ' + error.message);
+    } finally {
+        showLoadingIndicator(false); // Hide loading indicator
+    }
+}
+
+
+async function payRent() {
+    const amount = document.getElementById('rentAmount').value;
+    const weiAmount = web3.utils.toWei(amount, 'ether');
+
+    if (!validateRentAmount()) return;
+
+    if (parseFloat(amount) <= 0) {
+        alert('Please enter a valid rent amount greater than zero.');
+        return;
+    }
+
+    try {
+        const accounts = await web3.eth.getAccounts();
+        const currentAccount = accounts[0];
+
+        // Log the tenant address and current account
+        console.log("Current account:", currentAccount);
+        console.log("Expected tenant address:", tenantAddress); // Ensure this is defined
+
+        // Ensure the current account is the tenant
+        if (!tenantAddress) {
+            alert('Tenant address is not defined. Please sign the agreement first.');
+            return;
+        }
+
+        if (currentAccount.toLowerCase() !== tenantAddress.toLowerCase()) {
+            alert('You are not authorized to pay rent.');
+            return;
+        }
+
+        // Estimate gas limit
+        const gasEstimate = await contract.methods.payRent().estimateGas({ from: currentAccount, value: weiAmount });
+
+        showLoadingIndicator(true);
+
+        const result = await contract.methods.payRent().send({
+            from: currentAccount,
+            value: weiAmount,
+            gas: gasEstimate
+        });
+
+        await updateUI();
+        document.getElementById('rentAmount').value = '';
+        alert('Rent paid successfully! Transaction Hash: ' + result.transactionHash);
+    } catch (error) {
+        handleError(error, 'paying rent');
+    } finally {
+        showLoadingIndicator(false);
+    }
+}
+
+async function completeAgreement() {
+    try {
+        const currentAccount = (await web3.eth.getAccounts())[0];
+        showLoadingIndicator(true); // Show loading indicator
+        await contract.methods.completeAgreement()
+            .send({ from: currentAccount });
+        await updateUI();
+    } catch (error) {
+        handleError(error, 'completing agreement');
+    } finally {
+        showLoadingIndicator(false); // Hide loading indicator
+    }
+}
+
+async function terminateAgreement() {
+    const currentAccount = (await web3.eth.getAccounts())[0];
+    try {
+        showLoadingIndicator(true); // Show loading indicator
+        await contract.methods.terminateAgreement()
+            .send({ from: currentAccount });
+        await updateUI();
+    } catch (error) {
+        handleError(error, 'terminating agreement');
+    } finally {
+        showLoadingIndicator(false); // Hide loading indicator
+    }
+}
+
+// Combined account switching function
+async function switchAccount(accountType) {
+    try {
+        const currentAccount = (await web3.eth.getAccounts())[0];
+        if (accountType === 'landlord' && landlordAccount !== currentAccount) {
+            await window.ethereum.request({
+                method: 'wallet_switchEthereumChain',
+                params: [{ chainId: '0x018d3B67B3842d0943201e532dE62D953874F10A' }] // Adjust based on your network
+            });
+            landlordAccount = currentAccount;
+        } else if (accountType === 'tenant' && tenantAccount !== currentAccount) {
+            await window.ethereum.request({
+                method: 'wallet_switchEthereumChain',
+                params: [{ chainId: '0x2689EaC815e64CF7e6b7e8Fa3Ae1d3CD38b682E9' }] // Adjust based on your network
+            });
+            tenantAccount = currentAccount;
+        }
+        await updateUI();
+    } catch (error) {
+        handleError(error, 'switching accounts');
+    }
+}
+
+// Utility function to show loading indicator
+function showLoadingIndicator(show) {
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    if (loadingIndicator) {
+        loadingIndicator.style.display = show ? 'block' : 'none';
+    } else {
+        console.error('Loading indicator element not found!');
+    }
+}
+
+// Error handling logic
+function handleInitializationError(error) {
+    console.error('Initialization error:', error);
+    let message = 'Failed to initialize: ';
+    
+    if (error.code === -32603) {
+        message += 'Please check if Ganache is running and MetaMask is connected to the correct network';
+    } else if (error.code === 4001) {
+        message += 'User denied account access';
+    } else {
+        message += error.message;
+    }
+    
+    alert(message);
+}
+
+// Input validation functions
+function validateRoomInput() {
+    const roomNumber = document.getElementById('roomNumber').value;
+    const roomAddress = document.getElementById('roomAddress').value;
+
+    if (!roomNumber || roomNumber <= 0) {
+        alert('Please enter a valid room number');
+        return false;
+    }
+
+    if (!roomAddress.trim()) {
+        alert('Please enter a room address');
+        return false;
+    }
+
+    return true;
+}
+
+function validateRentAmount() {
+    const amount = document.getElementById('rentAmount').value;
+
+    if (!amount || amount <= 0) {
+        alert('Please enter a valid rent amount');
+        return false;
+    }
+
+    return true;
+}
+
+// Helper function to determine role
+function getRole(account) {
+    return account.toLowerCase() === landlordAccount.toLowerCase() ? 'Landlord' : 'Tenant';
+}
+
+// Initialize Web3 when the page loads
+window.onload = initWeb3;
+
+
+    </script>
+</body>
+</html>
